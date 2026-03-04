@@ -5,5 +5,5 @@ import App from './EventPulse.jsx'
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <App />
-  </React.StrictMode>
+  <script type="module" src="/src/main.jsx"></script>
 )
