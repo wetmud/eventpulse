@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-// ─── DEMO DATA ──────────────────────────────────────────────────────────────
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+// ─── CONSTANTS ───────────────────────────────────────────────────────────────
 
 const CATEGORIES = ["Concerts", "Theatre", "Comedy", "Festivals", "Sports", "Other"];
 
@@ -29,22 +32,10 @@ const SOURCE_COLORS = {
   Bandsintown:  "#00b4b3",
   Songkick:     "#f80046",
   StubHub:      "#4a148c",
+  User:         "#6b7280",
 };
 
-const VENUES = [
-  "Scotiabank Arena", "Rogers Centre", "Budweiser Stage", "History",
-  "Danforth Music Hall", "Rebel", "Queen Elizabeth Theatre", "Roy Thomson Hall",
-  "Meridian Hall", "FirstOntario Centre",
-];
-
-const ARTISTS = [
-  "The Weeknd", "Drake", "Billie Eilish", "Arctic Monkeys", "Tame Impala",
-  "Kendrick Lamar", "Taylor Swift", "Bad Bunny", "Dua Lipa", "Post Malone",
-  "Radiohead", "Frank Ocean", "SZA", "Tyler The Creator", "Childish Gambino",
-  "LCD Soundsystem", "Vampire Weekend", "Beach House", "Car Seat Headrest", "boygenius",
-];
-
-const IMAGES = [
+const FALLBACK_IMAGES = [
   "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&q=80",
   "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=400&q=80",
   "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&q=80",
@@ -55,55 +46,54 @@ const IMAGES = [
   "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400&q=80",
 ];
 
-function seededRand(seed) {
-  let s = seed;
-  return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+
+function capitalizeSource(source) {
+  if (!source) return "Other";
+  const map = {
+    ticketmaster:    "Ticketmaster",
+    eventbrite:      "Eventbrite",
+    bandsintown:     "Bandsintown",
+    songkick:        "Songkick",
+    stubhub:         "StubHub",
+    user_submission: "User",
+  };
+  return map[source] || source.charAt(0).toUpperCase() + source.slice(1);
 }
 
-function generateEvents() {
-  const events = [];
-  const now = new Date(2026, 2, 1);
-  let id = 1;
-  for (let day = 1; day <= 31; day++) {
-    const date = new Date(2026, 2, day);
-    if (date.getMonth() !== 2) continue;
-    const rng = seededRand(day * 137 + 42);
-    const count = Math.floor(rng() * 13);
-    for (let i = 0; i < count; i++) {
-      const cat = CATEGORIES[Math.floor(rng() * CATEGORIES.length)];
-      const artist = ARTISTS[Math.floor(rng() * ARTISTS.length)];
-      const venue = VENUES[Math.floor(rng() * VENUES.length)];
-      const source = SOURCES[Math.floor(rng() * SOURCES.length)];
-      const hour = 18 + Math.floor(rng() * 4);
-      const min = rng() > 0.5 ? "00" : "30";
-      const priceMin = Math.floor(rng() * 40 + 20);
-      const priceMax = priceMin + Math.floor(rng() * 80 + 20);
-      events.push({
-        id: id++,
-        title: cat === "Concerts" || cat === "Festivals" ? `${artist}` : cat === "Sports" ? `TFC vs CF Montréal` : `${cat} Night`,
-        artist,
-        category: cat,
-        date: `2026-03-${String(day).padStart(2, "0")}`,
-        day,
-        time: `${hour}:${min}`,
-        venue,
-        source,
-        priceMin,
-        priceMax,
-        image: IMAGES[Math.floor(rng() * IMAGES.length)],
-        popularityScore: Math.floor(rng() * 100),
-        ticketUrl: "#",
-        liked: false,
-        notified: false,
-      });
-    }
-  }
-  return events;
+function normalizeApiEvent(raw, liked, notified) {
+  const day = parseInt(raw.event_date?.split("-")[2] || "1", 10);
+  const time = raw.start_time ? raw.start_time.substring(0, 5) : "";
+  const source = capitalizeSource(raw.source);
+  // Deterministic fallback image based on id hash
+  const imgIdx = raw.id ? raw.id.charCodeAt(0) % FALLBACK_IMAGES.length : 0;
+
+  return {
+    id:             raw.id,
+    title:          raw.title,
+    artist:         raw.subcategory || raw.title,
+    category:       raw.category || "Other",
+    date:           raw.event_date,
+    day,
+    time,
+    venue:          raw.venues?.name || "Unknown Venue",
+    source,
+    priceMin:       raw.price_min,
+    priceMax:       raw.price_max,
+    image:          raw.image_url || FALLBACK_IMAGES[imgIdx],
+    popularityScore: raw.popularity_score || 0,
+    ticketUrl:      raw.ticket_url || "#",
+    liked:          liked.has(raw.id),
+    notified:       notified.has(raw.id),
+  };
 }
 
-const ALL_EVENTS = generateEvents();
-
-// ─── DENSITY HELPERS ────────────────────────────────────────────────────────
+// ─── DENSITY HELPERS ─────────────────────────────────────────────────────────
 
 function getDensityStyle(count) {
   if (count === 0) return { bg: "rgba(255,255,255,0.03)", dot: "#444", glow: "none", badge: "#444" };
@@ -113,16 +103,17 @@ function getDensityStyle(count) {
   return { bg: "rgba(239,68,68,0.18)", dot: "#ef4444", glow: "0 0 24px rgba(239,68,68,0.55)", badge: "#ef4444" };
 }
 
-// ─── SUB-COMPONENTS ─────────────────────────────────────────────────────────
+// ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
 
 function SourceBadge({ source }) {
+  const color = SOURCE_COLORS[source] || "#6b7280";
   return (
     <span style={{
       fontSize: 9, fontWeight: 700, letterSpacing: "0.04em",
       padding: "2px 6px", borderRadius: 20,
-      background: SOURCE_COLORS[source] + "33",
-      color: SOURCE_COLORS[source],
-      border: `1px solid ${SOURCE_COLORS[source]}55`,
+      background: color + "33",
+      color,
+      border: `1px solid ${color}55`,
     }}>{source}</span>
   );
 }
@@ -154,7 +145,7 @@ function EventCard({ event, onLike, onNotify, compact = false }) {
       {!compact && (
         <img src={event.image} alt="" style={{
           width: 52, height: 52, borderRadius: 8, objectFit: "cover", flexShrink: 0,
-        }} />
+        }} onError={e => { e.target.src = FALLBACK_IMAGES[0]; }} />
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 }}>
@@ -167,9 +158,9 @@ function EventCard({ event, onLike, onNotify, compact = false }) {
           {event.title}
         </div>
         <div style={{ fontSize: 11, color: "#9ca3af", display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span>🕐 {event.time}</span>
+          {event.time && <span>🕐 {event.time}</span>}
           <span>📍 {event.venue}</span>
-          {event.priceMin && <span style={{ color: "#34d399" }}>${event.priceMin}–${event.priceMax}</span>}
+          {event.priceMin != null && <span style={{ color: "#34d399" }}>${event.priceMin}–${event.priceMax}</span>}
         </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "center" }}>
@@ -197,6 +188,8 @@ function EventCard({ event, onLike, onNotify, compact = false }) {
         >{event.notified ? "🔔" : "🔕"}</button>
         <a
           href={event.ticketUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           onClick={e => e.stopPropagation()}
           style={{
             background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
@@ -210,19 +203,19 @@ function EventCard({ event, onLike, onNotify, compact = false }) {
   );
 }
 
-// ─── DATE BUBBLE (grows out of cell) ────────────────────────────────────────
+// ─── DATE BUBBLE (grows out of cell) ─────────────────────────────────────────
 
-function DateBubble({ day, events, anchor, onClose, onLike, onNotify }) {
+function DateBubble({ day, month, year, events, anchor, onClose, onLike, onNotify }) {
   const ref = useRef(null);
   const [visible, setVisible] = useState(false);
   const [filter, setFilter] = useState("All");
 
-  useEffect(() => {
+  useState(() => {
     requestAnimationFrame(() => requestAnimationFrame(() => setVisible(true)));
     const onKey = e => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  });
 
   const grouped = {};
   CATEGORIES.forEach(c => { grouped[c] = events.filter(e => e.category === c); });
@@ -231,13 +224,10 @@ function DateBubble({ day, events, anchor, onClose, onLike, onNotify }) {
 
   if (!anchor) return null;
 
-  // Position: try to grow from the anchor cell center
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const anchorCx = anchor.left + anchor.width / 2;
   const anchorCy = anchor.top + anchor.height / 2;
-
-  // Bubble size
   const bw = Math.min(420, vw - 32);
   const bh = Math.min(560, vh - 40);
   let left = anchorCx - bw / 2;
@@ -246,13 +236,14 @@ function DateBubble({ day, events, anchor, onClose, onLike, onNotify }) {
   if (left + bw > vw - 8) left = vw - bw - 8;
   if (top < 8) top = 8;
   if (top + bh > vh - 8) top = vh - bh - 8;
-
   const originX = anchorCx - left;
   const originY = anchorCy - top;
 
+  const dateLabel = new Date(year, month - 1, day)
+    .toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric" });
+
   return (
     <>
-      {/* Backdrop */}
       <div
         onClick={onClose}
         style={{
@@ -261,13 +252,11 @@ function DateBubble({ day, events, anchor, onClose, onLike, onNotify }) {
           opacity: visible ? 1 : 0, transition: "opacity 0.3s ease",
         }}
       />
-      {/* Bubble */}
       <div
         ref={ref}
         style={{
           position: "fixed", left, top,
-          width: bw, height: bh,
-          zIndex: 1001,
+          width: bw, height: bh, zIndex: 1001,
           background: "linear-gradient(160deg, #13131f 0%, #0d0d1a 100%)",
           border: "1.5px solid rgba(139,92,246,0.35)",
           borderRadius: 20,
@@ -280,7 +269,6 @@ function DateBubble({ day, events, anchor, onClose, onLike, onNotify }) {
           overflow: "hidden",
         }}
       >
-        {/* Header */}
         <div style={{
           padding: "16px 18px 12px",
           background: "linear-gradient(180deg, rgba(139,92,246,0.12) 0%, transparent 100%)",
@@ -290,7 +278,7 @@ function DateBubble({ day, events, anchor, onClose, onLike, onNotify }) {
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
             <div>
               <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em" }}>
-                {new Date(2026, 2, day).toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric" })}
+                {dateLabel}
               </div>
               <div style={{ fontSize: 13, color: "#8b5cf6", fontWeight: 600, marginTop: 2 }}>
                 {events.length} event{events.length !== 1 ? "s" : ""}
@@ -302,7 +290,6 @@ function DateBubble({ day, events, anchor, onClose, onLike, onNotify }) {
               cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center",
             }}>✕</button>
           </div>
-          {/* Category filter tabs */}
           <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
             {["All", ...cats].map(c => (
               <button key={c} onClick={() => setFilter(c)} style={{
@@ -318,8 +305,6 @@ function DateBubble({ day, events, anchor, onClose, onLike, onNotify }) {
             ))}
           </div>
         </div>
-
-        {/* Events list */}
         <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
           {filtered.length === 0 && (
             <div style={{ textAlign: "center", color: "#4b5563", paddingTop: 40, fontSize: 14 }}>No events in this category</div>
@@ -333,10 +318,13 @@ function DateBubble({ day, events, anchor, onClose, onLike, onNotify }) {
   );
 }
 
-// ─── DISCOVER CARD ──────────────────────────────────────────────────────────
+// ─── DISCOVER CARD ────────────────────────────────────────────────────────────
 
 function DiscoverCard({ event, onLike, onNotify }) {
-  const [expanded, setExpanded] = useState(false);
+  const dateLabel = event.date
+    ? new Date(event.date + "T12:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric" })
+    : "";
+
   return (
     <div style={{
       background: "linear-gradient(160deg, #15151f, #0f0f1a)",
@@ -352,7 +340,12 @@ function DiscoverCard({ event, onLike, onNotify }) {
       onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
     >
       <div style={{ position: "relative" }}>
-        <img src={event.image} alt="" style={{ width: "100%", height: 150, objectFit: "cover", display: "block" }} />
+        <img
+          src={event.image}
+          alt=""
+          style={{ width: "100%", height: 150, objectFit: "cover", display: "block" }}
+          onError={e => { e.target.src = FALLBACK_IMAGES[0]; }}
+        />
         <div style={{
           position: "absolute", inset: 0,
           background: "linear-gradient(to top, rgba(15,15,26,1) 0%, transparent 55%)",
@@ -381,14 +374,16 @@ function DiscoverCard({ event, onLike, onNotify }) {
       <div style={{ padding: "12px 14px 14px" }}>
         <div style={{ fontSize: 14, fontWeight: 800, color: "#fff", marginBottom: 4, lineHeight: 1.3 }}>{event.title}</div>
         <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 8 }}>
-          📅 Mar {event.day} · {event.time} · 📍 {event.venue}
+          📅 {dateLabel}{event.time && ` · ${event.time}`} · 📍 {event.venue}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
             <SourceBadge source={event.source} />
-            <span style={{ fontSize: 11, color: "#34d399", fontWeight: 700 }}>${event.priceMin}–${event.priceMax}</span>
+            {event.priceMin != null && (
+              <span style={{ fontSize: 11, color: "#34d399", fontWeight: 700 }}>${event.priceMin}–${event.priceMax}</span>
+            )}
           </div>
-          <a href={event.ticketUrl} style={{
+          <a href={event.ticketUrl} target="_blank" rel="noopener noreferrer" style={{
             background: "linear-gradient(135deg,#6366f1,#8b5cf6)",
             color: "#fff", fontSize: 10, fontWeight: 700,
             padding: "5px 12px", borderRadius: 8, textDecoration: "none",
@@ -399,22 +394,55 @@ function DiscoverCard({ event, onLike, onNotify }) {
   );
 }
 
-// ─── MAIN APP ────────────────────────────────────────────────────────────────
+// ─── LOADING SKELETON ─────────────────────────────────────────────────────────
+
+function CalendarSkeleton() {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
+      {Array.from({ length: 35 }, (_, i) => (
+        <div key={i} style={{
+          background: "rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.04)",
+          borderRadius: 10, minHeight: 70,
+          animation: "pulse 1.5s ease-in-out infinite",
+        }} />
+      ))}
+    </div>
+  );
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
 export default function EventPulse() {
-  const [events, setEvents] = useState(ALL_EVENTS);
+  const now = new Date();
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [year, setYear] = useState(now.getFullYear());
+  const [liked, setLiked] = useState(new Set());
+  const [notified, setNotified] = useState(new Set());
   const [selectedDay, setSelectedDay] = useState(null);
   const [bubbleAnchor, setBubbleAnchor] = useState(null);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("All");
-  const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState(null);
+  const [discoverKey, setDiscoverKey] = useState(0);
   const discoverRef = useRef(null);
 
-  const today = 4; // March 4 2026
+  const { data: apiData, isLoading, isError, isFetching, refetch, dataUpdatedAt } = useQuery({
+    queryKey: ["events", year, month],
+    queryFn: async () => {
+      const res = await fetch(`${API_URL}/api/events?month=${month}&year=${year}&limit=500`);
+      if (!res.ok) throw new Error("Failed to fetch events");
+      return res.json();
+    },
+  });
 
-  const filteredEvents = events.filter(e => {
-    const matchSearch = !search || e.title.toLowerCase().includes(search.toLowerCase()) ||
+  // Normalize API events to UI shape, injecting liked/notified state
+  const allEvents = (apiData?.events || []).map(e => normalizeApiEvent(e, liked, notified));
+
+  // Filtered by search and category
+  const filteredEvents = allEvents.filter(e => {
+    const matchSearch = !search ||
+      e.title.toLowerCase().includes(search.toLowerCase()) ||
       e.venue.toLowerCase().includes(search.toLowerCase()) ||
       e.artist.toLowerCase().includes(search.toLowerCase());
     const matchCat = catFilter === "All" || e.category === catFilter;
@@ -423,28 +451,57 @@ export default function EventPulse() {
 
   const eventsForDay = (day) => filteredEvents.filter(e => e.day === day);
 
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2500);
+  // Month navigation
+  const navigateMonth = (dir) => {
+    setSelectedDay(null);
+    setBubbleAnchor(null);
+    setMonth(prev => {
+      let m = prev + dir;
+      if (m < 1) { setYear(y => y - 1); return 12; }
+      if (m > 12) { setYear(y => y + 1); return 1; }
+      return m;
+    });
   };
 
-  const handleLike = useCallback((id) => {
-    setEvents(prev => prev.map(e => {
-      if (e.id !== id) return e;
-      const newLiked = !e.liked;
-      if (newLiked) showToast(`❤️ Liked ${e.artist || e.title}`);
-      return { ...e, liked: newLiked };
-    }));
+  const goToday = () => {
+    setMonth(now.getMonth() + 1);
+    setYear(now.getFullYear());
+    setSelectedDay(null);
+    setBubbleAnchor(null);
+  };
+
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
   }, []);
 
+  const handleLike = useCallback((id) => {
+    setLiked(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        const ev = allEvents.find(e => e.id === id);
+        if (ev) showToast(`❤️ Liked ${ev.title}`);
+      }
+      return next;
+    });
+  }, [allEvents, showToast]);
+
   const handleNotify = useCallback((id) => {
-    setEvents(prev => prev.map(e => {
-      if (e.id !== id) return e;
-      const newNotified = !e.notified;
-      if (newNotified) showToast(`🔔 You'll be notified about ${e.artist || e.title}`);
-      return { ...e, notified: newNotified };
-    }));
-  }, []);
+    setNotified(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        const ev = allEvents.find(e => e.id === id);
+        if (ev) showToast(`🔔 You'll be notified about ${ev.title}`);
+      }
+      return next;
+    });
+  }, [allEvents, showToast]);
 
   const handleDayClick = (day, cellEl) => {
     const rect = cellEl.getBoundingClientRect();
@@ -453,31 +510,43 @@ export default function EventPulse() {
   };
 
   const handleSync = () => {
-    setSyncing(true);
-    setTimeout(() => { setSyncing(false); showToast("✅ Synced — 117 events loaded"); }, 1800);
+    refetch();
+    showToast("⟳ Refreshing events…");
   };
 
   // Stats
   const monthEvents = filteredEvents.length;
   const activeDays = new Set(filteredEvents.map(e => e.day)).size;
   const avgPerDay = activeDays > 0 ? (monthEvents / activeDays).toFixed(1) : "0";
-  const hotDays = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31]
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  const hotDays = Array.from({ length: daysInMonth }, (_, i) => i + 1)
     .map(d => ({ d, c: eventsForDay(d).length }))
     .filter(x => x.c > 0)
-    .sort((a,b) => b.c - a.c).slice(0, 6);
+    .sort((a, b) => b.c - a.c)
+    .slice(0, 6);
   const busiest = hotDays[0];
 
   const catCounts = {};
   CATEGORIES.forEach(c => { catCounts[c] = filteredEvents.filter(e => e.category === c).length; });
-  const topCat = Object.entries(catCounts).sort((a,b) => b[1]-a[1])[0];
+  const topCat = Object.entries(catCounts).sort((a, b) => b[1] - a[1])[0];
 
-  // Discover: random subset of filteredEvents
-  const discoverEvents = [...filteredEvents].sort(() => 0.5 - Math.random()).slice(0, 20);
+  // Discover: shuffle on discoverKey change
+  const discoverEvents = [...filteredEvents]
+    .sort((a, b) => (a.id + discoverKey > b.id + discoverKey ? 1 : -1))
+    .slice(0, 20);
 
   // Calendar grid
-  const firstDay = new Date(2026, 2, 1).getDay();
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
   const paddingBefore = Array.from({ length: firstDay }, () => null);
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month;
+  const todayDay = now.getDate();
+
+  // Last sync label
+  const syncedLabel = dataUpdatedAt
+    ? new Date(dataUpdatedAt).toLocaleTimeString("en-CA", { hour: "2-digit", minute: "2-digit" })
+    : "—";
 
   return (
     <div style={{
@@ -509,7 +578,6 @@ export default function EventPulse() {
         position: "sticky", top: 0, zIndex: 100,
         backdropFilter: "blur(12px)",
       }}>
-        {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginRight: "auto" }}>
           <div style={{
             width: 38, height: 38, borderRadius: 11,
@@ -527,7 +595,6 @@ export default function EventPulse() {
           </div>
         </div>
 
-        {/* Search */}
         <div style={{ position: "relative", flex: "1 1 220px", maxWidth: 360 }}>
           <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", fontSize: 13, opacity: 0.4 }}>🔍</span>
           <input
@@ -545,7 +612,6 @@ export default function EventPulse() {
           />
         </div>
 
-        {/* Buttons */}
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <button style={{
             background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
@@ -555,7 +621,7 @@ export default function EventPulse() {
           <button
             onClick={handleSync}
             style={{
-              background: syncing ? "rgba(139,92,246,0.3)" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
+              background: isFetching ? "rgba(139,92,246,0.3)" : "linear-gradient(135deg,#6366f1,#8b5cf6)",
               border: "none", borderRadius: 10, padding: "8px 16px",
               color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
               display: "flex", alignItems: "center", gap: 6,
@@ -563,8 +629,8 @@ export default function EventPulse() {
               transition: "all 0.2s",
             }}
           >
-            <span style={{ display: "inline-block", animation: syncing ? "spin 0.8s linear infinite" : "none" }}>⟳</span>
-            {syncing ? "Syncing…" : "Sync Now"}
+            <span style={{ display: "inline-block", animation: isFetching ? "spin 0.8s linear infinite" : "none" }}>⟳</span>
+            {isFetching ? "Loading…" : "Refresh"}
           </button>
         </div>
       </header>
@@ -572,12 +638,16 @@ export default function EventPulse() {
       {/* LIVE STATUS */}
       <div style={{ padding: "8px 24px", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "#6b7280" }}>
-          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block", boxShadow: "0 0 6px #22c55e" }} />
-          Live · synced 0s ago
+          <span style={{
+            width: 6, height: 6, borderRadius: "50%",
+            background: isError ? "#ef4444" : "#22c55e",
+            display: "inline-block",
+            boxShadow: isError ? "0 0 6px #ef4444" : "0 0 6px #22c55e",
+          }} />
+          {isError ? "Error loading events" : `Live · synced ${syncedLabel}`}
           <span style={{ margin: "0 4px" }}>·</span>
-          📍 <b style={{ color: "#f97316" }}>80 km</b> radius · 28 venues
+          📍 <b style={{ color: "#f97316" }}>80 km</b> radius
         </div>
-        {/* Source legend */}
         <div style={{ marginLeft: "auto", display: "flex", gap: 12, flexWrap: "wrap" }}>
           {SOURCES.map(s => (
             <div key={s} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: "#6b7280" }}>
@@ -588,15 +658,32 @@ export default function EventPulse() {
         </div>
       </div>
 
+      {/* ERROR BANNER */}
+      {isError && (
+        <div style={{
+          margin: "12px 24px", padding: "12px 16px",
+          background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)",
+          borderRadius: 10, fontSize: 13, color: "#fca5a5",
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          ⚠️ Could not load events from the API. Check that the backend is running and the sync has been triggered.
+          <button onClick={() => refetch()} style={{
+            marginLeft: "auto", background: "rgba(239,68,68,0.2)",
+            border: "1px solid rgba(239,68,68,0.4)", color: "#fca5a5",
+            borderRadius: 8, padding: "4px 12px", fontSize: 12, cursor: "pointer",
+          }}>Retry</button>
+        </div>
+      )}
+
       {/* STATS */}
       <div style={{ padding: "14px 24px", display: "flex", gap: 12, flexWrap: "wrap" }}>
         {[
-          { icon: "📊", val: monthEvents, label: "Events / Month", color: "#38bdf8" },
-          { icon: "📈", val: avgPerDay, label: "Avg / Active Day", color: "#818cf8" },
-          { icon: "🔥", val: busiest ? `Mar ${busiest.d} (${busiest.c})` : "—", label: "Busiest Day", color: "#fb923c" },
-          { icon: "✨", val: topCat ? topCat[0] : "—", label: "Top Category", color: "#34d399" },
-          { icon: "📍", val: 28, label: "Venues In Range", color: "#f472b6" },
-          { icon: "⚡", val: "6 Live", label: "API Sources", color: "#facc15" },
+          { icon: "📊", val: isLoading ? "…" : monthEvents, label: "Events / Month", color: "#38bdf8" },
+          { icon: "📈", val: isLoading ? "…" : avgPerDay, label: "Avg / Active Day", color: "#818cf8" },
+          { icon: "🔥", val: isLoading ? "…" : busiest ? `${MONTH_NAMES[month-1].slice(0,3)} ${busiest.d} (${busiest.c})` : "—", label: "Busiest Day", color: "#fb923c" },
+          { icon: "✨", val: isLoading ? "…" : topCat?.[0] || "—", label: "Top Category", color: "#34d399" },
+          { icon: "📍", val: isLoading ? "…" : new Set(filteredEvents.map(e => e.venue)).size, label: "Venues In Range", color: "#f472b6" },
+          { icon: "⚡", val: isLoading ? "…" : new Set(filteredEvents.map(e => e.source)).size + " Live", label: "API Sources", color: "#facc15" },
         ].map(s => (
           <div key={s.label} style={{
             background: "rgba(255,255,255,0.04)",
@@ -643,11 +730,13 @@ export default function EventPulse() {
         <div style={{ flex: "1 1 620px", minWidth: 0 }}>
           {/* Month nav */}
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
-            <h2 style={{ fontSize: 26, fontWeight: 900, letterSpacing: "-0.03em", margin: 0 }}>March 2026</h2>
+            <h2 style={{ fontSize: 26, fontWeight: 900, letterSpacing: "-0.03em", margin: 0 }}>
+              {MONTH_NAMES[month - 1]} {year}
+            </h2>
             <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-              <button style={{ background: "rgba(255,255,255,0.07)", border: "none", color: "#fff", borderRadius: 9, width: 32, height: 32, cursor: "pointer", fontSize: 14 }}>‹</button>
-              <button style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", border: "none", color: "#fff", borderRadius: 9, padding: "0 14px", height: 32, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Today</button>
-              <button style={{ background: "rgba(255,255,255,0.07)", border: "none", color: "#fff", borderRadius: 9, width: 32, height: 32, cursor: "pointer", fontSize: 14 }}>›</button>
+              <button onClick={() => navigateMonth(-1)} style={{ background: "rgba(255,255,255,0.07)", border: "none", color: "#fff", borderRadius: 9, width: 32, height: 32, cursor: "pointer", fontSize: 14 }}>‹</button>
+              <button onClick={goToday} style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)", border: "none", color: "#fff", borderRadius: 9, padding: "0 14px", height: 32, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>Today</button>
+              <button onClick={() => navigateMonth(1)} style={{ background: "rgba(255,255,255,0.07)", border: "none", color: "#fff", borderRadius: 9, width: 32, height: 32, cursor: "pointer", fontSize: 14 }}>›</button>
             </div>
           </div>
 
@@ -659,71 +748,70 @@ export default function EventPulse() {
           </div>
 
           {/* Calendar grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
-            {paddingBefore.map((_, i) => <div key={`p${i}`} />)}
-            {days.map(day => {
-              const dayEvs = eventsForDay(day);
-              const count = dayEvs.length;
-              const ds = getDensityStyle(count);
-              const isToday = day === today;
-              const catDots = CATEGORIES.filter(c => dayEvs.some(e => e.category === c));
+          {isLoading ? <CalendarSkeleton /> : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 4 }}>
+              {paddingBefore.map((_, i) => <div key={`p${i}`} />)}
+              {days.map(day => {
+                const dayEvs = eventsForDay(day);
+                const count = dayEvs.length;
+                const ds = getDensityStyle(count);
+                const isToday = isCurrentMonth && day === todayDay;
+                const catDots = CATEGORIES.filter(c => dayEvs.some(e => e.category === c));
 
-              return (
-                <div
-                  key={day}
-                  onClick={count > 0 ? (e) => handleDayClick(day, e.currentTarget) : undefined}
-                  style={{
-                    background: isToday ? "rgba(99,102,241,0.15)" : ds.bg,
-                    border: isToday ? "1.5px solid #6366f1" : `1px solid rgba(255,255,255,${count > 0 ? "0.08" : "0.04"})`,
-                    borderRadius: 10,
-                    padding: "8px 8px 6px",
-                    minHeight: 70,
-                    cursor: count > 0 ? "pointer" : "default",
-                    position: "relative",
-                    transition: "background 0.2s, box-shadow 0.2s, transform 0.15s",
-                    boxShadow: count > 0 ? ds.glow : "none",
-                    display: "flex", flexDirection: "column",
-                  }}
-                  onMouseEnter={e => {
-                    if (count > 0) {
-                      e.currentTarget.style.background = isToday ? "rgba(99,102,241,0.25)" : ds.bg.replace(/[\d.]+\)$/, m => Math.min(parseFloat(m) + 0.08, 1) + ")");
-                      e.currentTarget.style.transform = "scale(1.03)";
-                      e.currentTarget.style.zIndex = 2;
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = isToday ? "rgba(99,102,241,0.15)" : ds.bg;
-                    e.currentTarget.style.transform = "scale(1)";
-                    e.currentTarget.style.zIndex = 1;
-                  }}
-                >
-                  <span style={{
-                    fontSize: 12, fontWeight: isToday ? 900 : 700,
-                    color: isToday ? "#8b5cf6" : count > 0 ? "#e5e7eb" : "#4b5563",
-                  }}>{day}</span>
+                return (
+                  <div
+                    key={day}
+                    data-day={day}
+                    onClick={count > 0 ? (e) => handleDayClick(day, e.currentTarget) : undefined}
+                    style={{
+                      background: isToday ? "rgba(99,102,241,0.15)" : ds.bg,
+                      border: isToday ? "1.5px solid #6366f1" : `1px solid rgba(255,255,255,${count > 0 ? "0.08" : "0.04"})`,
+                      borderRadius: 10,
+                      padding: "8px 8px 6px",
+                      minHeight: 70,
+                      cursor: count > 0 ? "pointer" : "default",
+                      position: "relative",
+                      transition: "background 0.2s, box-shadow 0.2s, transform 0.15s",
+                      boxShadow: count > 0 ? ds.glow : "none",
+                      display: "flex", flexDirection: "column",
+                    }}
+                    onMouseEnter={e => {
+                      if (count > 0) {
+                        e.currentTarget.style.transform = "scale(1.03)";
+                        e.currentTarget.style.zIndex = 2;
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.zIndex = 1;
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 12, fontWeight: isToday ? 900 : 700,
+                      color: isToday ? "#8b5cf6" : count > 0 ? "#e5e7eb" : "#4b5563",
+                    }}>{day}</span>
 
-                  {/* Category dots */}
-                  {catDots.length > 0 && (
-                    <div style={{ display: "flex", gap: 3, marginTop: 6, flexWrap: "wrap" }}>
-                      {catDots.slice(0, 4).map(c => <CategoryDot key={c} category={c} size={6} />)}
-                    </div>
-                  )}
+                    {catDots.length > 0 && (
+                      <div style={{ display: "flex", gap: 3, marginTop: 6, flexWrap: "wrap" }}>
+                        {catDots.slice(0, 4).map(c => <CategoryDot key={c} category={c} size={6} />)}
+                      </div>
+                    )}
 
-                  {/* Count badge */}
-                  {count > 0 && (
-                    <div style={{
-                      position: "absolute", bottom: 6, right: 6,
-                      background: ds.badge,
-                      color: "#fff", fontSize: 10, fontWeight: 800,
-                      width: 18, height: 18, borderRadius: "50%",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      boxShadow: `0 2px 8px ${ds.badge}66`,
-                    }}>{count}</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    {count > 0 && (
+                      <div style={{
+                        position: "absolute", bottom: 6, right: 6,
+                        background: ds.badge,
+                        color: "#fff", fontSize: 10, fontWeight: 800,
+                        width: 18, height: 18, borderRadius: "50%",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        boxShadow: `0 2px 8px ${ds.badge}66`,
+                      }}>{count}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* SIDEBAR */}
@@ -759,22 +847,27 @@ export default function EventPulse() {
             borderRadius: 16, padding: "16px",
           }}>
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#4b5563", marginBottom: 12 }}>🔥 HOT DATES</div>
+            {hotDays.length === 0 && (
+              <div style={{ fontSize: 12, color: "#4b5563", textAlign: "center", padding: "16px 0" }}>
+                {isLoading ? "Loading…" : "No events yet"}
+              </div>
+            )}
             {hotDays.map(({ d, c }) => {
               const ds = getDensityStyle(c);
+              const dateLabel = new Date(year, month - 1, d)
+                .toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" });
               return (
                 <div key={d} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
                   padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,0.05)",
                   cursor: "pointer",
-                }} onClick={e => {
+                }} onClick={() => {
                   const calCell = document.querySelector(`[data-day="${d}"]`);
-                  if (calCell) { const rect = calCell.getBoundingClientRect(); handleDayClick(d, calCell); }
+                  if (calCell) handleDayClick(d, calCell);
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: ds.badge, display: "inline-block", boxShadow: `0 0 5px ${ds.badge}` }} />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#e5e7eb" }}>
-                      {new Date(2026, 2, d).toLocaleDateString("en-CA", { weekday: "short", month: "short", day: "numeric" })}
-                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#e5e7eb" }}>{dateLabel}</span>
                   </div>
                   <span style={{ fontSize: 13, fontWeight: 800, color: ds.badge }}>{c}</span>
                 </div>
@@ -792,7 +885,7 @@ export default function EventPulse() {
             <p style={{ margin: 0, fontSize: 12, color: "#4b5563", marginTop: 2 }}>Randomly surfaced from the current view</p>
           </div>
           <button
-            onClick={() => {}}
+            onClick={() => setDiscoverKey(k => k + 1)}
             style={{
               marginLeft: "auto",
               background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
@@ -800,10 +893,15 @@ export default function EventPulse() {
               fontSize: 12, fontWeight: 700, cursor: "pointer",
             }}
           >Shuffle ⟳</button>
-          {/* Scroll arrows */}
           <button onClick={() => { discoverRef.current.scrollBy({ left: -310, behavior: "smooth" }) }} style={{ background: "rgba(255,255,255,0.07)", border: "none", color: "#fff", borderRadius: 9, width: 32, height: 32, cursor: "pointer", fontSize: 16 }}>‹</button>
           <button onClick={() => { discoverRef.current.scrollBy({ left: 310, behavior: "smooth" }) }} style={{ background: "rgba(255,255,255,0.07)", border: "none", color: "#fff", borderRadius: 9, width: 32, height: 32, cursor: "pointer", fontSize: 16 }}>›</button>
         </div>
+
+        {discoverEvents.length === 0 && !isLoading && (
+          <div style={{ textAlign: "center", color: "#4b5563", padding: "40px 0", fontSize: 14 }}>
+            {isError ? "Could not load events." : "No events found. Try running a sync from the admin panel."}
+          </div>
+        )}
 
         <div
           ref={discoverRef}
@@ -824,6 +922,8 @@ export default function EventPulse() {
       {selectedDay !== null && bubbleAnchor && (
         <DateBubble
           day={selectedDay}
+          month={month}
+          year={year}
           events={eventsForDay(selectedDay)}
           anchor={bubbleAnchor}
           onClose={() => { setSelectedDay(null); setBubbleAnchor(null); }}
@@ -839,6 +939,7 @@ export default function EventPulse() {
         ::-webkit-scrollbar-thumb { background: rgba(139,92,246,0.4); border-radius: 4px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity:0; transform:translateX(-50%) translateY(-6px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
       `}</style>
     </div>
   );

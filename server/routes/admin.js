@@ -2,6 +2,7 @@ import express from 'express';
 import { supabase } from '../index.js';
 import { adminAuthMiddleware } from '../middleware/auth.js';
 import { strictLimiter } from '../middleware/rateLimit.js';
+import { syncAllSources } from '../services/sync.js';
 
 const router = express.Router();
 router.use(strictLimiter);
@@ -67,24 +68,16 @@ router.delete('/reject/:id', async (req, res) => {
 
 /**
  * POST /api/admin/sync
- * Manual trigger for event sync (Phase 2 - will be wired up later)
+ * Manual trigger for event sync
  */
 router.post('/sync', async (req, res) => {
   try {
-    // Will import syncAllSources in Phase 2
-    const { syncAllSources } = await import('../services/sync.js').catch(() => ({
-      syncAllSources: null,
-    }));
-
-    if (!syncAllSources) {
-      return res.status(501).json({ message: 'Sync service not yet configured. Complete Phase 2 first.' });
-    }
-
-    await syncAllSources();
-    res.json({ success: true });
+    console.log('Manual sync triggered via API');
+    const results = await syncAllSources();
+    res.json({ success: true, results });
   } catch (err) {
     console.error('POST /api/admin/sync error:', err);
-    res.status(500).json({ error: 'Sync failed.' });
+    res.status(500).json({ error: 'Sync failed.', details: err.message });
   }
 });
 
