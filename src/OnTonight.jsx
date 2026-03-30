@@ -105,12 +105,13 @@ function normalizeApiEvent(raw, liked, notified) {
 
 // ─── DENSITY HELPERS ─────────────────────────────────────────────────────────
 
-function getDensityStyle(count) {
-  if (count === 0) return { bg: "rgba(0,0,0,0.03)", dot: "#ccc", glow: "none", badge: "#ccc" };
-  if (count <= 2)  return { bg: "rgba(140,128,112,0.20)", dot: "#8C8070", glow: "none", badge: "#8C8070" };
-  if (count <= 5)  return { bg: "rgba(212,139,45,0.25)",  dot: "#D48B2D", glow: "none", badge: "#D48B2D" };
-  if (count <= 10) return { bg: "rgba(192,57,43,0.22)",   dot: "#C0392B", glow: "none", badge: "#C0392B" };
-  return { bg: "rgba(192,57,43,0.35)", dot: "#C0392B", glow: "none", badge: "#C0392B" };
+function getDensityStyle(count, maxCount = 10) {
+  if (count === 0) return { bg: "rgba(0,0,0,0.03)", dot: "#ccc", badge: "#ccc" };
+  const pct = maxCount > 0 ? count / maxCount : 0;
+  if (pct <= 0.25) return { bg: "rgba(140,128,112,0.18)", dot: "#8C8070", badge: "#8C8070" };
+  if (pct <= 0.55) return { bg: "rgba(212,139,45,0.28)",  dot: "#D48B2D", badge: "#D48B2D" };
+  if (pct <= 0.80) return { bg: "rgba(192,57,43,0.22)",   dot: "#C0392B", badge: "#C0392B" };
+  return { bg: "rgba(192,57,43,0.38)", dot: "#C0392B", badge: "#C0392B" };
 }
 
 // ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
@@ -271,7 +272,7 @@ function EventModal({ event, onClose, onLike, onNotify }) {
         backdropFilter: "blur(4px)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: "1rem",
-        animation: "fadeIn 0.2s ease",
+        animation: "overlayIn 0.2s ease",
       }}
     >
       <div
@@ -286,6 +287,7 @@ function EventModal({ event, onClose, onLike, onNotify }) {
           boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
           display: "flex",
           flexDirection: "column",
+          animation: "modalIn 0.25s cubic-bezier(0.16,1,0.3,1)",
         }}
       >
         {/* Image */}
@@ -389,7 +391,7 @@ function EventModal({ event, onClose, onLike, onNotify }) {
               <Bell size={14} weight={event.notified ? "fill" : "regular"} />
               Notify
             </button>
-            {event.ticketUrl && (
+            {event.ticketUrl ? (
               <a
                 href={event.ticketUrl}
                 target="_blank"
@@ -405,6 +407,23 @@ function EventModal({ event, onClose, onLike, onNotify }) {
               >
                 <Ticket size={14} weight="bold" />
                 Get tickets
+              </a>
+            ) : (
+              <a
+                href={`https://www.ticketmaster.ca/search?q=${encodeURIComponent(event.title)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  marginLeft: "auto",
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "transparent", color: "#6b6055",
+                  borderRadius: 10, padding: "8px 20px",
+                  fontSize: 13, fontWeight: 700, textDecoration: "none",
+                  border: "1px solid #E8E2D9",
+                }}
+              >
+                <Ticket size={14} weight="regular" />
+                Find tickets
               </a>
             )}
           </div>
@@ -514,6 +533,9 @@ export default function OnTonight() {
   };
 
   const daysInMonth = new Date(year, month, 0).getDate();
+
+  const dayCounts = Array.from({ length: daysInMonth }, (_, i) => eventsForDay(i + 1).length);
+  const maxEventsInDay = Math.max(...dayCounts, 1);
 
   const hotDays = Array.from({ length: daysInMonth }, (_, i) => i + 1)
     .map(d => ({ d, c: eventsForDay(d).length }))
@@ -691,7 +713,7 @@ export default function OnTonight() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: "0.75rem" }}>
             <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "#9c8e82" }}>🔥 HOT DATES</span>
             {hotDays.map(({ d, c }) => {
-              const ds = getDensityStyle(c);
+              const ds = getDensityStyle(c, maxEventsInDay);
               const dateLabel = new Date(year, month - 1, d).toLocaleDateString("en-CA", { month: "short", day: "numeric" });
               const isSelected = selectedDay === d;
               return (
@@ -740,11 +762,17 @@ export default function OnTonight() {
                 background: catFilter === c ? CAT_COLORS[c] : "#fff",
                 color: catFilter === c ? "#fff" : "#1A1714",
                 border: `1px solid ${catFilter === c ? CAT_COLORS[c] : "#d4ccc4"}`,
-                borderRadius: 20, padding: "4px 12px",
+                borderRadius: 20, padding: "4px 10px",
                 fontSize: 11, fontWeight: 700, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 4,
               }}
             >
-              {CAT_ICONS[c]} {c} <span style={{ opacity: 0.7, fontSize: 10 }}>({catCounts[c]})</span>
+              <span style={{
+                display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+                background: catFilter === c ? "rgba(255,255,255,0.6)" : CAT_COLORS[c], flexShrink: 0,
+              }} />
+              {c}
+              <span style={{ opacity: 0.65, fontSize: 10 }}>({catCounts[c]})</span>
             </button>
           ))}
         </div>
@@ -839,7 +867,7 @@ export default function OnTonight() {
                 {days.map(day => {
                   const dayEvs = eventsForDay(day);
                   const count = dayEvs.length;
-                  const ds = getDensityStyle(count);
+                  const ds = getDensityStyle(count, maxEventsInDay);
                   const isToday = isCurrentMonth && day === todayDay;
                   const isSelected = selectedDay === day;
                   const catDots = CATEGORIES.filter(c => dayEvs.some(e => e.category === c));
@@ -904,7 +932,7 @@ export default function OnTonight() {
                   border: `1px solid ${catFilter === c ? "transparent" : "#E8E2D9"}`,
                   transition: "all 0.15s",
                 }}>
-                  {c === "All" ? "All" : `${CAT_ICONS[c]} ${c}`}
+                  {c === "All" ? "All" : c}
                 </button>
               ))}
             </div>
@@ -1030,6 +1058,8 @@ export default function OnTonight() {
         ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.15); border-radius: 4px; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes fadeIn { from { opacity:0; transform:translateX(-50%) translateY(-6px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+        @keyframes overlayIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes modalIn { from { opacity:0; transform: scale(0.96) translateY(8px); } to { opacity:1; transform: scale(1) translateY(0); } }
         @keyframes bounceDown { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
         @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.7; } }
       `}</style>
