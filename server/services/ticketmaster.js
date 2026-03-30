@@ -29,10 +29,10 @@ function sleep(ms) {
 async function fetchPage(page = 0, retries = 3) {
   const url = new URL(BASE_URL);
   url.searchParams.set('apikey', API_KEY);
-  url.searchParams.set('city', 'Toronto');
-  url.searchParams.set('countryCode', 'CA');
-  url.searchParams.set('radius', '80');
+  url.searchParams.set('latlong', '43.50,-79.65'); // GTA geographic center — covers Toronto to Hamilton
+  url.searchParams.set('radius', '100');
   url.searchParams.set('unit', 'km');
+  url.searchParams.set('countryCode', 'CA');
   url.searchParams.set('size', '200');
   url.searchParams.set('page', page);
   url.searchParams.set('sort', 'date,asc');

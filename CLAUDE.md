@@ -93,6 +93,14 @@ Once Railway is green:
 
 ---
 
+## Jason To-Do (manual actions needed)
+
+- [ ] **Trigger a fresh sync** after this deploys — `POST /api/admin/sync` with `x-admin-key` header. This will re-fetch with the new `latlong` center and populate Hamilton/Burlington venues.
+- [ ] **Get API keys** for Songkick, Bandsintown, Eventbrite when ready to add more sources
+- [ ] **Decide on project name** before Phase 3 — rename repo + Vercel + Railway + Supabase (painful later)
+
+---
+
 ## Known Gotchas
 
 - **`npm install` won't run in the Claude VM** — Railway runs it at deploy time

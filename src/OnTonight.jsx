@@ -232,9 +232,12 @@ function LocationModal({ current, onSave, onClose }) {
       >
         {/* Header */}
         <div style={{ padding: "1.25rem 1.5rem 1rem", borderBottom: "1px solid #E8E2D9", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#1A1714", fontFamily: "'Playfair Display', Georgia, serif" }}>
-            Set your area
-          </h3>
+          <div>
+            {!current && <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "#C0392B", textTransform: "uppercase", marginBottom: 3 }}>Welcome to OnTonight</div>}
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#1A1714", fontFamily: "'Playfair Display', Georgia, serif" }}>
+              {current ? "Set your area" : "Where are you?"}
+            </h3>
+          </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9c8e82" }}>
             <X size={18} weight="bold" />
           </button>
@@ -307,15 +310,16 @@ function LocationModal({ current, onSave, onClose }) {
             </p>
           )}
 
-          {current && (
+          {current ? (
             <button
               onClick={() => { onSave(null); onClose(); }}
-              style={{
-                width: "100%", marginTop: 6, padding: "8px",
-                background: "transparent", color: "#9c8e82",
-                border: "none", fontSize: 11, fontWeight: 600, cursor: "pointer",
-              }}
+              style={{ width: "100%", marginTop: 6, padding: "8px", background: "transparent", color: "#9c8e82", border: "none", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
             >Clear filter</button>
+          ) : (
+            <button
+              onClick={onClose}
+              style={{ width: "100%", marginTop: 6, padding: "8px", background: "transparent", color: "#9c8e82", border: "none", fontSize: 11, fontWeight: 600, cursor: "pointer" }}
+            >Show all GTA events</button>
           )}
         </div>
       </div>
@@ -748,7 +752,7 @@ export default function OnTonight() {
   const [likedAnimating, setLikedAnimating] = useState(new Set());
   const [userLocation, setUserLocation] = useState(() => loadSavedLocation());
   const [radiusKm, setRadiusKm] = useState(() => loadSavedLocation()?.radiusKm ?? 10);
-  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(() => !loadSavedLocation());
 
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => {
