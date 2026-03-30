@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Clock, MapPin, Heart, Bell, X, Ticket } from "@phosphor-icons/react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -96,7 +97,7 @@ function normalizeApiEvent(raw, liked, notified) {
     priceMax:       raw.price_max,
     image:          raw.image_url || FALLBACK_IMAGES[imgIdx],
     popularityScore: raw.popularity_score || 0,
-    ticketUrl:      raw.ticket_url || "#",
+    ticketUrl:      raw.ticket_url || null,
     liked:          liked.has(raw.id),
     notified:       notified.has(raw.id),
   };
@@ -106,10 +107,10 @@ function normalizeApiEvent(raw, liked, notified) {
 
 function getDensityStyle(count) {
   if (count === 0) return { bg: "rgba(0,0,0,0.03)", dot: "#ccc", glow: "none", badge: "#ccc" };
-  if (count <= 2)  return { bg: "rgba(140,128,112,0.12)", dot: "#8C8070", glow: "none", badge: "#8C8070" };
-  if (count <= 5)  return { bg: "rgba(212,139,45,0.15)",  dot: "#D48B2D", glow: "none", badge: "#D48B2D" };
-  if (count <= 10) return { bg: "rgba(192,57,43,0.15)",   dot: "#C0392B", glow: "none", badge: "#C0392B" };
-  return { bg: "rgba(192,57,43,0.25)", dot: "#C0392B", glow: "none", badge: "#C0392B" };
+  if (count <= 2)  return { bg: "rgba(140,128,112,0.20)", dot: "#8C8070", glow: "none", badge: "#8C8070" };
+  if (count <= 5)  return { bg: "rgba(212,139,45,0.25)",  dot: "#D48B2D", glow: "none", badge: "#D48B2D" };
+  if (count <= 10) return { bg: "rgba(192,57,43,0.22)",   dot: "#C0392B", glow: "none", badge: "#C0392B" };
+  return { bg: "rgba(192,57,43,0.35)", dot: "#C0392B", glow: "none", badge: "#C0392B" };
 }
 
 // ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
@@ -136,33 +137,48 @@ function CategoryDot({ category, size = 7 }) {
   );
 }
 
-function EventCard({ event, onLike, onNotify }) {
+function EventCard({ event, onLike, onNotify, onOpen }) {
   const catColor = CAT_COLORS[event.category] || "#6b7280";
   return (
-    <div style={{
-      background: "#ffffff",
-      borderRadius: 10,
-      boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
-      border: "1px solid #E8E2D9",
-      borderLeft: `4px solid ${catColor}`,
-      padding: "0.85rem 1rem",
-      display: "flex",
-      gap: "0.75rem",
-      alignItems: "flex-start",
-    }}>
+    <div
+      onClick={() => onOpen(event)}
+      style={{
+        background: "#ffffff",
+        borderRadius: 10,
+        boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
+        border: "1px solid #E8E2D9",
+        borderLeft: `4px solid ${catColor}`,
+        padding: "0.85rem 1rem",
+        display: "flex",
+        gap: "0.75rem",
+        alignItems: "flex-start",
+        cursor: "pointer",
+        transition: "box-shadow 0.15s, transform 0.15s",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.12)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 6px rgba(0,0,0,0.07)"; e.currentTarget.style.transform = "translateY(0)"; }}
+    >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: catColor }}>
-            {CAT_ICONS[event.category]} {event.category}
+            {event.category}
           </span>
           <SourceBadge source={event.source} />
         </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1714", lineHeight: 1.3, marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1714", lineHeight: 1.3, marginBottom: 4 }}>
           {event.title}
         </div>
-        <div style={{ fontSize: 11, color: "#6b6055", display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {event.time && <span>🕐 {event.time}</span>}
-          <span>📍 {event.venue}</span>
+        <div style={{ fontSize: 11, color: "#6b6055", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {event.time && (
+            <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+              <Clock size={11} weight="bold" />
+              {event.time}
+            </span>
+          )}
+          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <MapPin size={11} weight="bold" />
+            {event.venue}
+          </span>
           {event.priceMin != null && <span style={{ color: "#16a34a", fontWeight: 600 }}>${event.priceMin}–${event.priceMax}</span>}
         </div>
       </div>
@@ -173,30 +189,41 @@ function EventCard({ event, onLike, onNotify }) {
             background: event.liked ? "#fff0f0" : "#f9f7f4",
             border: `1px solid ${event.liked ? "#fca5a5" : "#E8E2D9"}`,
             borderRadius: 8, width: 30, height: 30, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: event.liked ? "#e63030" : "#9c8e82",
           }}
-        >{event.liked ? "❤️" : "🤍"}</button>
+        ><Heart size={14} weight={event.liked ? "fill" : "regular"} /></button>
         <button
           onClick={e => { e.stopPropagation(); onNotify(event.id); }}
           style={{
             background: event.notified ? "#fffbeb" : "#f9f7f4",
             border: `1px solid ${event.notified ? "#fcd34d" : "#E8E2D9"}`,
             borderRadius: 8, width: 30, height: 30, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: event.notified ? "#b45309" : "#9c8e82",
           }}
-        >{event.notified ? "🔔" : "🔕"}</button>
-        <a
-          href={event.ticketUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
-          style={{
-            background: "#C0392B",
-            color: "#fff", fontSize: 9, fontWeight: 700,
-            padding: "4px 7px", borderRadius: 6, textDecoration: "none",
-            letterSpacing: "0.04em",
-          }}
-        >BUY</a>
+        ><Bell size={14} weight={event.notified ? "fill" : "regular"} /></button>
+        {event.ticketUrl && (
+          <a
+            href={event.ticketUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "transparent",
+              color: "#C0392B", fontSize: 9, fontWeight: 700,
+              padding: "4px 7px", borderRadius: 6, textDecoration: "none",
+              letterSpacing: "0.04em",
+              border: "1px solid #C0392B",
+              display: "flex", alignItems: "center", gap: 3,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#C0392B"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#C0392B"; }}
+          >
+            <Ticket size={9} weight="bold" />
+            BUY
+          </a>
+        )}
       </div>
     </div>
   );
@@ -219,6 +246,174 @@ function CalendarSkeleton() {
   );
 }
 
+// ─── EVENT MODAL ─────────────────────────────────────────────────────────────
+
+function EventModal({ event, onClose, onLike, onNotify }) {
+  const catColor = CAT_COLORS[event.category] || "#6b7280";
+
+  // Close on Escape key
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const formattedDate = event.date
+    ? new Date(event.date + "T12:00:00").toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric" })
+    : null;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 1000,
+        background: "rgba(26,23,20,0.65)",
+        backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "1rem",
+        animation: "fadeIn 0.2s ease",
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#FAF8F4",
+          borderRadius: 16,
+          width: "100%",
+          maxWidth: 520,
+          maxHeight: "90vh",
+          overflow: "hidden",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Image */}
+        <div style={{ position: "relative", height: 220, flexShrink: 0 }}>
+          {event.image ? (
+            <img
+              src={event.image}
+              alt={event.title}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              onError={e => { e.target.style.display = "none"; e.target.nextSibling.style.display = "flex"; }}
+            />
+          ) : null}
+          {/* Fallback */}
+          <div style={{
+            display: event.image ? "none" : "flex",
+            width: "100%", height: "100%",
+            background: `linear-gradient(135deg, ${catColor}33 0%, ${catColor}88 100%)`,
+            alignItems: "center", justifyContent: "center",
+            flexDirection: "column", gap: 8,
+          }}>
+            <span style={{ fontSize: 40 }}>{CAT_ICONS[event.category]}</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: catColor, opacity: 0.8 }}>{event.venue}</span>
+          </div>
+          {/* Left color bar overlay */}
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 5, background: catColor }} />
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            style={{
+              position: "absolute", top: 12, right: 12,
+              background: "rgba(26,23,20,0.6)", border: "none",
+              borderRadius: "50%", width: 32, height: 32,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: "pointer", color: "#fff",
+            }}
+          ><X size={16} weight="bold" /></button>
+        </div>
+
+        {/* Content */}
+        <div style={{ padding: "1.25rem 1.5rem", overflowY: "auto", flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+              color: catColor, textTransform: "uppercase",
+            }}>{event.category}</span>
+            <SourceBadge source={event.source} />
+          </div>
+
+          <h2 style={{
+            margin: "0 0 1rem 0",
+            fontSize: "1.35rem", fontWeight: 800,
+            lineHeight: 1.2, color: "#1A1714",
+            fontFamily: "'Playfair Display', Georgia, serif",
+          }}>{event.title}</h2>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: "1.25rem" }}>
+            {formattedDate && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#4a4040" }}>
+                <Clock size={14} weight="bold" color={catColor} />
+                <span>{formattedDate}{event.time ? ` · ${event.time}` : ""}</span>
+              </div>
+            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#4a4040" }}>
+              <MapPin size={14} weight="bold" color={catColor} />
+              <span>{event.venue}</span>
+            </div>
+            {event.priceMin != null && (
+              <div style={{ fontSize: 13, color: "#16a34a", fontWeight: 700 }}>
+                ${event.priceMin}{event.priceMax && event.priceMax !== event.priceMin ? `–$${event.priceMax}` : ""}
+              </div>
+            )}
+          </div>
+
+          {/* Action row */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              onClick={() => onLike(event.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: event.liked ? "#fff0f0" : "#F5F0E8",
+                border: `1px solid ${event.liked ? "#fca5a5" : "#E8E2D9"}`,
+                borderRadius: 10, padding: "8px 14px",
+                fontSize: 12, fontWeight: 700, cursor: "pointer",
+                color: event.liked ? "#e63030" : "#6b6055",
+              }}
+            >
+              <Heart size={14} weight={event.liked ? "fill" : "regular"} />
+              {event.liked ? "Saved" : "Save"}
+            </button>
+            <button
+              onClick={() => onNotify(event.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: event.notified ? "#fffbeb" : "#F5F0E8",
+                border: `1px solid ${event.notified ? "#fcd34d" : "#E8E2D9"}`,
+                borderRadius: 10, padding: "8px 14px",
+                fontSize: 12, fontWeight: 700, cursor: "pointer",
+                color: event.notified ? "#b45309" : "#6b6055",
+              }}
+            >
+              <Bell size={14} weight={event.notified ? "fill" : "regular"} />
+              Notify
+            </button>
+            {event.ticketUrl && (
+              <a
+                href={event.ticketUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  marginLeft: "auto",
+                  display: "flex", alignItems: "center", gap: 6,
+                  background: "#1A1714", color: "#fff",
+                  borderRadius: 10, padding: "8px 20px",
+                  fontSize: 13, fontWeight: 800, textDecoration: "none",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                <Ticket size={14} weight="bold" />
+                Get tickets
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
 export default function OnTonight() {
@@ -231,6 +426,7 @@ export default function OnTonight() {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("All");
   const [toast, setToast] = useState(null);
+  const [selectedEvent, setSelectedEvent] = useState(null);
 
   const [windowWidth, setWindowWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1200);
   useEffect(() => {
@@ -352,6 +548,16 @@ export default function OnTonight() {
           animation: "fadeIn 0.2s ease",
           whiteSpace: "nowrap",
         }}>{toast}</div>
+      )}
+
+      {/* Event Modal */}
+      {selectedEvent && (
+        <EventModal
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          onLike={handleLike}
+          onNotify={handleNotify}
+        />
       )}
 
       {/* HERO — 100vh */}
@@ -646,14 +852,11 @@ export default function OnTonight() {
                       style={{
                         background: isSelected
                           ? "#1A1714"
-                          : isToday
-                            ? "rgba(124,58,237,0.12)"
-                            : ds.bg,
+                          : ds.bg,
                         border: isSelected
                           ? "1.5px solid #1A1714"
-                          : isToday
-                            ? "1.5px solid #C0392B"
-                            : `1px solid ${count > 0 ? "#E8E2D9" : "rgba(0,0,0,0.05)"}`,
+                          : `1px solid ${count > 0 ? "#E8E2D9" : "rgba(0,0,0,0.05)"}`,
+                        borderBottom: isToday && !isSelected ? "2.5px solid #C0392B" : undefined,
                         borderRadius: 8,
                         padding: "6px 5px 5px",
                         minHeight: 58,
@@ -755,42 +958,56 @@ export default function OnTonight() {
             </div>
           </div>
 
-          {/* Active day filter indicator */}
-          {selectedDay && (
-            <div style={{
-              marginBottom: "0.75rem", padding: "8px 12px",
-              background: "#1A1714", borderRadius: 8,
-              fontSize: 12, color: "#fff", fontWeight: 600,
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-              <span>Showing events for {MONTH_NAMES[month - 1]} {selectedDay} · {filteredEvents.length} event{filteredEvents.length !== 1 ? "s" : ""}</span>
-              <button onClick={() => setSelectedDay(null)} style={{
-                background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 6,
-                color: "#fff", fontSize: 11, padding: "2px 8px", cursor: "pointer", fontWeight: 700,
-              }}>Clear</button>
+          {/* Event list heading */}
+          <div style={{ marginBottom: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#1A1714", letterSpacing: "-0.01em" }}>
+                Events
+              </span>
+              {selectedDay ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "#6b6055", fontWeight: 600 }}>
+                    {MONTH_NAMES[month - 1]} {selectedDay} · {filteredEvents.length} showing
+                  </span>
+                  <button onClick={() => setSelectedDay(null)} style={{
+                    background: "#1A1714", border: "none", borderRadius: 6,
+                    color: "#fff", fontSize: 10, padding: "2px 8px", cursor: "pointer", fontWeight: 700,
+                  }}>Clear</button>
+                </div>
+              ) : (
+                <span style={{ fontSize: 11, color: "#9c8e82", fontWeight: 600 }}>
+                  {isLoading ? "Loading…" : `${filteredEvents.length} in ${MONTH_NAMES[month - 1]}`}
+                </span>
+              )}
             </div>
-          )}
-
-          {/* Event count label */}
-          {!selectedDay && (
-            <div style={{ fontSize: 12, color: "#9c8e82", marginBottom: "0.75rem", fontWeight: 600 }}>
-              {isLoading ? "Loading events…" : `${filteredEvents.length} events in ${MONTH_NAMES[month - 1]} ${year}`}
-            </div>
-          )}
+          </div>
 
           {/* Event cards */}
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             {filteredEvents.length === 0 && !isLoading && (
               <div style={{
-                textAlign: "center", padding: "3rem 1rem",
-                color: "#9c8e82", fontSize: 14,
+                textAlign: "center", padding: "3rem 1.5rem",
+                color: "#9c8e82",
               }}>
-                {isError
-                  ? "Could not load events. Is the backend running?"
-                  : selectedDay
-                    ? `No events on ${MONTH_NAMES[month - 1]} ${selectedDay}.`
-                    : "No events match your filters."
-                }
+                <div style={{ fontSize: 28, marginBottom: 12 }}>
+                  {isError ? "⚠️" : selectedDay ? "🌙" : "🔍"}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#6b6055", marginBottom: 4 }}>
+                  {isError
+                    ? "Could not load events"
+                    : selectedDay
+                      ? `Nothing on ${MONTH_NAMES[month - 1]} ${selectedDay}`
+                      : "No events match your filters"
+                  }
+                </div>
+                <div style={{ fontSize: 12, lineHeight: 1.5 }}>
+                  {isError
+                    ? "Is the backend running?"
+                    : selectedDay
+                      ? "Toronto doesn't take many nights off — try the night before or after."
+                      : "Try removing a filter or broadening your search."
+                  }
+                </div>
               </div>
             )}
             {isLoading && (
@@ -799,7 +1016,7 @@ export default function OnTonight() {
               </div>
             )}
             {filteredEvents.map(ev => (
-              <EventCard key={ev.id} event={ev} onLike={handleLike} onNotify={handleNotify} />
+              <EventCard key={ev.id} event={ev} onLike={handleLike} onNotify={handleNotify} onOpen={setSelectedEvent} />
             ))}
           </div>
         </div>
