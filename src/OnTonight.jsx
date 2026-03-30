@@ -7,13 +7,23 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const CATEGORIES = ["Concerts", "Theatre", "Comedy", "Festivals", "Sports", "Other"];
 
+const THEME = {
+  paper:    "#F5F0E8",
+  ink:      "#1A1714",
+  warmWhite:"#FAF8F4",
+  accent:   "#C0392B",
+  amber:    "#D48B2D",
+  mid:      "#8C8070",
+  deep:     "#2C2420",
+};
+
 const CAT_COLORS = {
-  Concerts:  "#a78bfa",
-  Theatre:   "#fb923c",
-  Comedy:    "#facc15",
-  Festivals: "#34d399",
-  Sports:    "#38bdf8",
-  Other:     "#f472b6",
+  Concerts:  "#C0392B",
+  Theatre:   "#D48B2D",
+  Comedy:    "#8C6D3F",
+  Festivals: "#5C7A5C",
+  Sports:    "#3A6080",
+  Other:     "#7A6080",
 };
 
 const CAT_ICONS = {
@@ -96,10 +106,10 @@ function normalizeApiEvent(raw, liked, notified) {
 
 function getDensityStyle(count) {
   if (count === 0) return { bg: "rgba(0,0,0,0.03)", dot: "#ccc", glow: "none", badge: "#ccc" };
-  if (count <= 2)  return { bg: "rgba(59,130,246,0.12)",  dot: "#3b82f6", glow: "none", badge: "#3b82f6" };
-  if (count <= 5)  return { bg: "rgba(139,92,246,0.15)", dot: "#8b5cf6", glow: "none", badge: "#8b5cf6" };
-  if (count <= 10) return { bg: "rgba(249,115,22,0.18)", dot: "#f97316", glow: "none", badge: "#f97316" };
-  return { bg: "rgba(239,68,68,0.22)", dot: "#ef4444", glow: "none", badge: "#ef4444" };
+  if (count <= 2)  return { bg: "rgba(140,128,112,0.12)", dot: "#8C8070", glow: "none", badge: "#8C8070" };
+  if (count <= 5)  return { bg: "rgba(212,139,45,0.15)",  dot: "#D48B2D", glow: "none", badge: "#D48B2D" };
+  if (count <= 10) return { bg: "rgba(192,57,43,0.15)",   dot: "#C0392B", glow: "none", badge: "#C0392B" };
+  return { bg: "rgba(192,57,43,0.25)", dot: "#C0392B", glow: "none", badge: "#C0392B" };
 }
 
 // ─── SUB-COMPONENTS ──────────────────────────────────────────────────────────
@@ -133,7 +143,7 @@ function EventCard({ event, onLike, onNotify }) {
       background: "#ffffff",
       borderRadius: 10,
       boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
-      border: "1px solid #e5ddd4",
+      border: "1px solid #E8E2D9",
       borderLeft: `4px solid ${catColor}`,
       padding: "0.85rem 1rem",
       display: "flex",
@@ -147,7 +157,7 @@ function EventCard({ event, onLike, onNotify }) {
           </span>
           <SourceBadge source={event.source} />
         </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", lineHeight: 1.3, marginBottom: 4 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1714", lineHeight: 1.3, marginBottom: 4 }}>
           {event.title}
         </div>
         <div style={{ fontSize: 11, color: "#6b6055", display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -161,7 +171,7 @@ function EventCard({ event, onLike, onNotify }) {
           onClick={e => { e.stopPropagation(); onLike(event.id); }}
           style={{
             background: event.liked ? "#fff0f0" : "#f9f7f4",
-            border: `1px solid ${event.liked ? "#fca5a5" : "#e5ddd4"}`,
+            border: `1px solid ${event.liked ? "#fca5a5" : "#E8E2D9"}`,
             borderRadius: 8, width: 30, height: 30, cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
           }}
@@ -170,7 +180,7 @@ function EventCard({ event, onLike, onNotify }) {
           onClick={e => { e.stopPropagation(); onNotify(event.id); }}
           style={{
             background: event.notified ? "#fffbeb" : "#f9f7f4",
-            border: `1px solid ${event.notified ? "#fcd34d" : "#e5ddd4"}`,
+            border: `1px solid ${event.notified ? "#fcd34d" : "#E8E2D9"}`,
             borderRadius: 8, width: 30, height: 30, cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14,
           }}
@@ -181,7 +191,7 @@ function EventCard({ event, onLike, onNotify }) {
           rel="noopener noreferrer"
           onClick={e => e.stopPropagation()}
           style={{
-            background: "#7c3aed",
+            background: "#C0392B",
             color: "#fff", fontSize: 9, fontWeight: 700,
             padding: "4px 7px", borderRadius: 6, textDecoration: "none",
             letterSpacing: "0.04em",
@@ -211,7 +221,7 @@ function CalendarSkeleton() {
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 
-export default function EventPulse() {
+export default function OnTonight() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
@@ -329,7 +339,7 @@ export default function EventPulse() {
     : "—";
 
   return (
-    <div style={{ fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif", background: "#f0ebe3", minHeight: "100vh", color: "#1a1a1a", overflowX: "hidden" }}>
+    <div style={{ fontFamily: "'Inter', 'Helvetica Neue', Arial, sans-serif", background: THEME.paper, minHeight: "100vh", color: THEME.ink, overflowX: "hidden" }}>
 
       {/* Toast */}
       {toast && (
@@ -345,18 +355,18 @@ export default function EventPulse() {
       )}
 
       {/* HERO — 100vh */}
-      <div id="hero" style={{ minHeight: "100vh", background: "#f0ebe3", display: "flex", flexDirection: "column" }}>
+      <div id="hero" style={{ minHeight: "100vh", background: THEME.paper, display: "flex", flexDirection: "column" }}>
 
         {/* Nav */}
         <nav style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1.25rem 2.5rem" }}>
-          <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "-0.02em", color: "#1a1a1a" }}>
-            <span>Event</span><span style={{ color: "#7c3aed" }}>Pulse</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#9c8e82", marginLeft: 6, letterSpacing: "0.04em" }}>· GTA</span>
+          <div style={{ fontSize: 15, fontWeight: 900, letterSpacing: "-0.02em", color: THEME.ink, fontFamily: "'Playfair Display', Georgia, serif" }}>
+            <span>On</span><span style={{ color: THEME.accent }}>Tonight</span>
+            <span style={{ fontSize: 11, fontWeight: 600, fontFamily: "'Inter', sans-serif", color: THEME.mid, marginLeft: 6, letterSpacing: "0.04em" }}>· GTA</span>
           </div>
           <div style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
             <a href="#app" style={{ fontSize: 13, fontWeight: 600, color: "#6b6055", textDecoration: "none" }}>How it works</a>
             <button style={{
-              background: "#1a1a1a", color: "#fff", border: "none",
+              background: "#1A1714", color: "#fff", border: "none",
               borderRadius: 8, padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer",
             }}>Sign in</button>
           </div>
@@ -373,29 +383,30 @@ export default function EventPulse() {
           {/* Left: editorial */}
           <div style={{ flex: "0 0 55%", display: "flex", flexDirection: "column", justifyContent: "center", paddingBottom: "3rem" }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", color: "#9c8e82", textTransform: "uppercase", marginBottom: "1.25rem" }}>
-              EVENTPULSE · GTA
+              ONTONIGHT · GTA
             </div>
 
             <h1 style={{
               fontSize: "clamp(4rem, 8vw, 8.5rem)",
-              fontWeight: 900,
+              fontWeight: 700,
               lineHeight: 0.93,
-              letterSpacing: "-0.04em",
-              color: "#1a1a1a",
+              letterSpacing: "-0.02em",
+              color: THEME.ink,
               margin: "0 0 1.5rem 0",
               whiteSpace: "pre-line",
-            }}>{"Events,\norganized."}</h1>
+              fontFamily: "'Playfair Display', Georgia, serif",
+            }}>{"Everything\nhappening\ntonight."}</h1>
 
-            <p style={{ fontSize: "1.1rem", color: "#6b6055", margin: "0 0 2rem 0", lineHeight: 1.5 }}>
-              Every GTA concert, festival, and show. One calendar.
+            <p style={{ fontSize: "1.1rem", color: THEME.mid, margin: "0 0 2rem 0", lineHeight: 1.5 }}>
+              Every GTA concert, festival, and show. One calendar. No noise.
             </p>
 
             {/* Three coloured strips */}
             <div style={{ display: "flex", flexDirection: "column", gap: 3, marginBottom: "2.5rem" }}>
               {[
-                { color: "#7c3aed", label: "Concerts", sub: "847 shows this month" },
-                { color: "#ea580c", label: "Festivals & Outdoor", sub: "Across 28 GTA venues" },
-                { color: "#0369a1", label: "Theatre · Comedy · Sports", sub: "Updated daily from live sources" },
+                { color: THEME.accent, label: "Concerts", sub: "847 shows this month" },
+                { color: THEME.amber,  label: "Festivals & Outdoor", sub: "Across 28 GTA venues" },
+                { color: THEME.deep,   label: "Theatre · Comedy · Sports", sub: "Updated daily from live sources" },
               ].map(strip => (
                 <div key={strip.label} style={{
                   background: strip.color,
@@ -441,7 +452,7 @@ export default function EventPulse() {
       </div>
 
       {/* STATS STRIP */}
-      <div style={{ background: "#e8e0d4", borderTop: "1px solid #d4ccc4", borderBottom: "1px solid #d4ccc4", padding: "1.25rem 2.5rem" }}>
+      <div style={{ background: "#EBE5DC", borderTop: "1px solid #D9D2C8", borderBottom: "1px solid #D9D2C8", padding: "1.25rem 2.5rem" }}>
 
         {/* Counters row */}
         <div style={{ display: "flex", gap: "2rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1rem" }}>
@@ -452,7 +463,7 @@ export default function EventPulse() {
             { val: "4", label: "Live sources" },
           ].map(s => (
             <div key={s.label} style={{ display: "flex", flexDirection: "column" }}>
-              <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: "-0.03em", color: "#1a1a1a" }}>{s.val}</span>
+              <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: "-0.03em", color: "#1A1714" }}>{s.val}</span>
               <span style={{ fontSize: 11, color: "#6b6055", fontWeight: 500 }}>{s.label}</span>
             </div>
           ))}
@@ -486,7 +497,7 @@ export default function EventPulse() {
                     border: `1px solid ${isSelected ? ds.badge : "#d4ccc4"}`,
                     borderRadius: 20, padding: "4px 10px",
                     fontSize: 11, fontWeight: 700, cursor: "pointer",
-                    color: isSelected ? "#fff" : "#1a1a1a",
+                    color: isSelected ? "#fff" : "#1A1714",
                     display: "flex", alignItems: "center", gap: 5,
                   }}
                 >
@@ -508,8 +519,8 @@ export default function EventPulse() {
           <button
             onClick={() => setCatFilter("All")}
             style={{
-              background: catFilter === "All" ? "#1a1a1a" : "#fff",
-              color: catFilter === "All" ? "#fff" : "#1a1a1a",
+              background: catFilter === "All" ? "#1A1714" : "#fff",
+              color: catFilter === "All" ? "#fff" : "#1A1714",
               border: "1px solid #d4ccc4",
               borderRadius: 20, padding: "4px 12px",
               fontSize: 11, fontWeight: 700, cursor: "pointer",
@@ -521,7 +532,7 @@ export default function EventPulse() {
               onClick={() => setCatFilter(c === catFilter ? "All" : c)}
               style={{
                 background: catFilter === c ? CAT_COLORS[c] : "#fff",
-                color: catFilter === c ? "#fff" : "#1a1a1a",
+                color: catFilter === c ? "#fff" : "#1A1714",
                 border: `1px solid ${catFilter === c ? CAT_COLORS[c] : "#d4ccc4"}`,
                 borderRadius: 20, padding: "4px 12px",
                 fontSize: 11, fontWeight: 700, cursor: "pointer",
@@ -567,34 +578,34 @@ export default function EventPulse() {
           background: "#ffffff",
           borderRadius: "12px",
           boxShadow: "0 2px 16px rgba(0,0,0,0.08)",
-          border: "1px solid #e5ddd4",
+          border: "1px solid #E8E2D9",
           overflow: "hidden",
           marginBottom: isMobile ? "1rem" : 0,
         }}>
           {/* Month nav */}
-          <div style={{ padding: "1rem 1rem 0.75rem", borderBottom: "1px solid #e5ddd4" }}>
+          <div style={{ padding: "1rem 1rem 0.75rem", borderBottom: "1px solid #E8E2D9" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 900, letterSpacing: "-0.02em", margin: 0, flex: 1, color: "#1a1a1a" }}>
+              <h2 style={{ fontSize: 18, fontWeight: 900, letterSpacing: "-0.02em", margin: 0, flex: 1, color: "#1A1714" }}>
                 {MONTH_NAMES[month - 1]} {year}
               </h2>
               <button onClick={() => navigateMonth(-1)} style={{
-                background: "#f0ebe3", border: "1px solid #e5ddd4", color: "#1a1a1a",
+                background: "#F5F0E8", border: "1px solid #E8E2D9", color: "#1A1714",
                 borderRadius: 8, width: 30, height: 30, cursor: "pointer", fontSize: 14,
               }}>‹</button>
               <button onClick={goToday} style={{
-                background: "#1a1a1a", border: "none", color: "#fff",
+                background: "#1A1714", border: "none", color: "#fff",
                 borderRadius: 8, padding: "0 12px", height: 30, cursor: "pointer",
                 fontSize: 11, fontWeight: 700,
               }}>Today</button>
               <button onClick={() => navigateMonth(1)} style={{
-                background: "#f0ebe3", border: "1px solid #e5ddd4", color: "#1a1a1a",
+                background: "#F5F0E8", border: "1px solid #E8E2D9", color: "#1A1714",
                 borderRadius: 8, width: 30, height: 30, cursor: "pointer", fontSize: 14,
               }}>›</button>
             </div>
 
             {selectedDay && (
               <div style={{
-                marginTop: "0.5rem", padding: "6px 10px", background: "#f0ebe3",
+                marginTop: "0.5rem", padding: "6px 10px", background: "#F5F0E8",
                 borderRadius: 8, fontSize: 12, color: "#6b6055", fontWeight: 600,
                 display: "flex", alignItems: "center", justifyContent: "space-between",
               }}>
@@ -634,15 +645,15 @@ export default function EventPulse() {
                       onClick={() => setSelectedDay(day === selectedDay ? null : day)}
                       style={{
                         background: isSelected
-                          ? "#1a1a1a"
+                          ? "#1A1714"
                           : isToday
                             ? "rgba(124,58,237,0.12)"
                             : ds.bg,
                         border: isSelected
-                          ? "1.5px solid #1a1a1a"
+                          ? "1.5px solid #1A1714"
                           : isToday
-                            ? "1.5px solid #7c3aed"
-                            : `1px solid ${count > 0 ? "#e5ddd4" : "rgba(0,0,0,0.05)"}`,
+                            ? "1.5px solid #C0392B"
+                            : `1px solid ${count > 0 ? "#E8E2D9" : "rgba(0,0,0,0.05)"}`,
                         borderRadius: 8,
                         padding: "6px 5px 5px",
                         minHeight: 58,
@@ -654,7 +665,7 @@ export default function EventPulse() {
                     >
                       <span style={{
                         fontSize: 11, fontWeight: isToday || isSelected ? 900 : 600,
-                        color: isSelected ? "#fff" : isToday ? "#7c3aed" : count > 0 ? "#1a1a1a" : "#9c8e82",
+                        color: isSelected ? "#fff" : isToday ? "#C0392B" : count > 0 ? "#1A1714" : "#9c8e82",
                       }}>{day}</span>
 
                       {catDots.length > 0 && (
@@ -680,14 +691,14 @@ export default function EventPulse() {
           </div>
 
           {/* Category filter pills */}
-          <div style={{ padding: "0.75rem", borderTop: "1px solid #e5ddd4" }}>
+          <div style={{ padding: "0.75rem", borderTop: "1px solid #E8E2D9" }}>
             <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
               {["All", ...CATEGORIES].map(c => (
                 <button key={c} onClick={() => setCatFilter(c)} style={{
                   fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 20, cursor: "pointer",
-                  background: catFilter === c ? (c === "All" ? "#1a1a1a" : CAT_COLORS[c]) : "#f0ebe3",
+                  background: catFilter === c ? (c === "All" ? "#1A1714" : CAT_COLORS[c]) : "#F5F0E8",
                   color: catFilter === c ? "#fff" : "#6b6055",
-                  border: `1px solid ${catFilter === c ? "transparent" : "#e5ddd4"}`,
+                  border: `1px solid ${catFilter === c ? "transparent" : "#E8E2D9"}`,
                   transition: "all 0.15s",
                 }}>
                   {c === "All" ? "All" : `${CAT_ICONS[c]} ${c}`}
@@ -706,7 +717,7 @@ export default function EventPulse() {
           {/* Sticky search bar */}
           <div style={{
             position: "sticky", top: 0, zIndex: 10,
-            background: "#f0ebe3", paddingBottom: "0.75rem",
+            background: "#F5F0E8", paddingBottom: "0.75rem",
           }}>
             <div style={{ position: "relative" }}>
               <span style={{
@@ -720,8 +731,8 @@ export default function EventPulse() {
                 style={{
                   width: "100%", boxSizing: "border-box",
                   background: "#ffffff",
-                  border: "1px solid #e5ddd4",
-                  borderRadius: 10, color: "#1a1a1a",
+                  border: "1px solid #E8E2D9",
+                  borderRadius: 10, color: "#1A1714",
                   padding: "10px 12px 10px 36px",
                   fontSize: 13, outline: "none",
                   boxShadow: "0 1px 6px rgba(0,0,0,0.07)",
@@ -731,7 +742,7 @@ export default function EventPulse() {
                 onClick={handleSync}
                 style={{
                   position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-                  background: isFetching ? "#f0ebe3" : "#1a1a1a",
+                  background: isFetching ? "#F5F0E8" : "#1A1714",
                   border: "none", borderRadius: 8, padding: "5px 12px",
                   color: isFetching ? "#6b6055" : "#fff",
                   fontSize: 11, fontWeight: 700, cursor: "pointer",
@@ -748,7 +759,7 @@ export default function EventPulse() {
           {selectedDay && (
             <div style={{
               marginBottom: "0.75rem", padding: "8px 12px",
-              background: "#1a1a1a", borderRadius: 8,
+              background: "#1A1714", borderRadius: 8,
               fontSize: 12, color: "#fff", fontWeight: 600,
               display: "flex", alignItems: "center", justifyContent: "space-between",
             }}>

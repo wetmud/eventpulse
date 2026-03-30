@@ -91,7 +91,7 @@ async function upsertEvents(events) {
  * Main sync function — runs all sources and reports results
  */
 export async function syncAllSources() {
-  console.log('=== EventPulse Sync Started ===', new Date().toISOString());
+  console.log('=== OnTonight Sync Started ===', new Date().toISOString());
 
   const results = {
     ticketmaster: { fetched: 0, inserted: 0, errors: 0 },

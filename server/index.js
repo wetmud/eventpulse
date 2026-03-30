@@ -48,5 +48,5 @@ cron.schedule('0 */6 * * *', async () => {
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`EventPulse API running on port ${PORT}`);
+  console.log(`OnTonight API running on port ${PORT}`);
 });

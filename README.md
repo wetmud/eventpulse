@@ -1,6 +1,6 @@
-# EventPulse
+# OnTonight
 
-Local event discovery for the Greater Toronto Area — aggregates concerts, festivals, sports, and theatre from multiple sources into a single calendar and discovery feed.
+Everything happening tonight. Local event discovery for the Greater Toronto Area — aggregates concerts, festivals, sports, and theatre from multiple sources into a single calendar and discovery feed.
 
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Status](https://img.shields.io/badge/status-in%20active%20development-yellow)
@@ -48,7 +48,7 @@ eventpulse/
 ├── package.json
 ├── src/
 │   ├── main.jsx              # QueryClientProvider wrapper
-│   ├── EventPulse.jsx        # Main app component
+│   ├── OnTonight.jsx         # Main app component
 │   └── lib/
 │       └── supabase.js       # Supabase JS client
 └── server/

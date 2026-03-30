@@ -1,6 +1,8 @@
-# EventPulse — CLAUDE.md
+# OnTonight — CLAUDE.md
 
 React/Vite event aggregation calendar for Toronto/GTA. Shows concerts, festivals, sports, theatre from multiple APIs in a calendar + discovery feed UI.
+
+**Tagline:** Everything happening tonight.
 
 **Roadmap:** `EventPulse_Roadmap.md` — 8 phases. Follow in order.
 
