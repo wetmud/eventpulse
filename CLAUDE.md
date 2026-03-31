@@ -22,7 +22,7 @@ React/Vite event aggregation calendar for Toronto/GTA. Shows concerts, festivals
 
 | Service | URL |
 |---------|-----|
-| Frontend (Vercel) | https://eventpulse-ednedbs9o-wetmuds-projects.vercel.app |
+| Frontend (Vercel) | https://ontonight-three.vercel.app |
 | Backend (Railway) | https://eventpulse-production-0256.up.railway.app |
 | Health check | https://eventpulse-production-0256.up.railway.app/api/health |
 | Supabase dashboard | https://supabase.com/dashboard/project/jrdfcngdggqanjgxohjk |
@@ -37,7 +37,7 @@ SUPABASE_URL=https://jrdfcngdggqanjgxohjk.supabase.co
 SUPABASE_SERVICE_KEY=[in Railway]
 TICKETMASTER_API_KEY=OTq1WeQGQGUDeVwf7Q3kCL5hyBTRxcKZ
 PORT=3001
-FRONTEND_URL=https://eventpulse-ednedbs9o-wetmuds-projects.vercel.app
+FRONTEND_URL=https://ontonight-three.vercel.app
 ADMIN_PASSWORD=[in Railway]
 RESEND_API_KEY=[placeholder — Phase 3]
 ANTHROPIC_API_KEY=[placeholder — Phase 6]
@@ -60,7 +60,7 @@ VITE_STRIPE_PUBLIC_KEY=[placeholder — Phase 8]
 | Phase | Status | Notes |
 |-------|--------|-------|
 | 1 — Foundation | ✅ Complete | Railway + Vercel + Supabase all live |
-| 2 — Real APIs | 🟡 Deploy pending | Code complete, needs Railway config fix + sync trigger |
+| 2 — Real APIs | ✅ Complete | Ticketmaster live, 500 events syncing, UI fully built |
 | 3 — User Accounts | ⬜ Not started | Supabase Auth + profiles |
 | 4 — User Submissions | ⬜ Not started | |
 | 5 — Map View | ⬜ Not started | Needs Mapbox token |
@@ -70,17 +70,23 @@ VITE_STRIPE_PUBLIC_KEY=[placeholder — Phase 8]
 
 ---
 
-## Phase 2 Sign-Off (still needed)
+## Current UI State (2026-03-30)
 
-Railway kept trying to run `vite build` from the wrong directory. Correct settings:
-- Root Directory: *(blank)*
-- Build Command: `cd server && npm install`
-- Start Command: `cd server && node index.js`
+`src/OnTonight.jsx` is the single main component. Key features shipped:
 
-Once Railway is green:
-1. Trigger manual sync: `POST /api/admin/sync` with header `x-admin-key: [ADMIN_PASSWORD]`
-2. Verify events appear in Supabase → `events` table
-3. Verify frontend calendar shows real events
+- Monthly calendar with relative density gradient (warm → amber → red based on max events that month)
+- Event modal with full-bleed image, ticket CTA, "Find tickets" fallback search link
+- 3-column layout: calendar (380px) | event list (flex) | My Night panel (268px)
+- My Night panel: saved events list, Account placeholder, Live Sources block
+- Category filter pills (stats strip + calendar sidebar)
+- Location filter: GTA area presets (12 areas incl. Hamilton, Burlington) + geolocation + radius picker
+- First-visit onboarding: location modal auto-opens if no saved location in localStorage
+- Like animation: heart spring-bounce on save
+- Bottom toast: "Saved to your night." / "Reminder set for…"
+- Phosphor icons throughout (Clock, MapPin, Heart, Bell, X, Ticket) — no emojis in UI
+- Empty states, error states, loading skeletons
+
+Dependencies added this session: `@phosphor-icons/react`
 
 ---
 
@@ -89,15 +95,24 @@ Once Railway is green:
 - Supabase Auth (email + Google OAuth)
 - Profile page
 - Persist liked/notified events to `saved_events` table
-- Wire `Sign in` button in hero nav
+- Wire `Sign in` button in My Night panel → hero nav
 
 ---
 
-## Jason To-Do (manual actions needed)
+## Jason To-Do (manual actions required)
 
-- [ ] **Trigger a fresh sync** after this deploys — `POST /api/admin/sync` with `x-admin-key` header. This will re-fetch with the new `latlong` center and populate Hamilton/Burlington venues.
+- [ ] **Trigger a fresh sync** — `POST /api/admin/sync` with `x-admin-key` header. Sync center changed from `city=Toronto` to `latlong=43.50,-79.65` (GTA center, r=100km). Fresh sync will populate Hamilton/Burlington venues so the location filter works there.
 - [ ] **Get API keys** for Songkick, Bandsintown, Eventbrite when ready to add more sources
-- [ ] **Decide on project name** before Phase 3 — rename repo + Vercel + Railway + Supabase (painful later)
+- [ ] **Decide on project name** before Phase 3 — rename repo + Vercel + Railway + Supabase (painful to rename later)
+
+---
+
+## Next Code Tasks (Claude to-do)
+
+- [ ] Narrow Ticketmaster sync date window — add `startDateTime`/`endDateTime` params (current month + 30 days) to avoid 500-event cap being filled by stale future events
+- [ ] Add `GET /api/sync-status` endpoint — return `{ lastSync, sources: { ticketmaster: { count, lastSync } } }` and wire to Live Sources panel
+- [ ] Framer Motion polish (P3): morphing card→modal (`layoutId`), staggered card load-in, calendar hover tooltips — needs `npm install framer-motion`
+- [ ] Multi-source ingestion: write fetcher services for Songkick / Bandsintown / Eventbrite (after API keys acquired)
 
 ---
 
@@ -108,6 +123,7 @@ Once Railway is green:
 - **`node-cron` must be in `server/package.json`** — confirm before Railway deploys
 - **Admin sync endpoint** requires `x-admin-key` header matching `ADMIN_PASSWORD` env var
 - **`.github/workflows/deploy.yml`** — old GitHub Pages deploy, may need disabling (Vercel handles deploys now)
+- **Ticketmaster 500-event cap** — free tier max is ~1000 results (size=200 × 5 pages). Currently hitting ~500 due to rate limit backoff. Date-window narrowing will help.
 
 ---
 
@@ -117,3 +133,4 @@ Once Railway is green:
 - `events.is_verified` — only `true` events returned by `/api/events` GET
 - `events.source_id` — external ID, `UNIQUE(source, source_id)` prevents duplicates
 - `profiles.id` — references `auth.users(id)` from Supabase Auth
+- `venues.latitude` / `venues.longitude` — populated by Ticketmaster sync, used for client-side haversine distance filter
